@@ -1,0 +1,207 @@
+@model DisplayViewModel
+@{
+    @if (Model.Type == "youtube")
+    {
+        ViewData["Title"] = $"{Model.CreatedBy} {Model.Title.ToLower()} video";
+    }
+    else
+    {
+        ViewData["Title"] = $"{Model.CreatedBy} {Model.Title.ToLower()}";
+    }
+    if (!string.IsNullOrEmpty(Model.OrganizationLogoUrl))
+    {
+        ViewData["OrgLogoUrl"] = Model.OrganizationLogoUrl;
+    }
+    ViewData["Description"] = StringTools.StripHTML(Model.Content);
+    ViewData["Url"] = $"{Context.Request.Scheme}://{Context.Request.Host}{Context.Request.Path}";
+}
+@section Metas {
+    @if (Model.Type == "system")
+    {
+        <meta property="og:image" content="@Model.CreatorImageUrl" />
+        <meta itemprop="image" content="@Model.CreatorImageUrl">
+        <meta name="twitter:image:src" content="@Model.CreatorImageUrl">
+    }
+    @if (Model.Type == "photos")
+    {
+        <meta property="og:image" content="@Model.FeedImageUrl.Split(',')[0]" />
+        <meta itemprop="image" content="@Model.FeedImageUrl.Split(',')[0]">
+        <meta name="twitter:image:src" content="@Model.FeedImageUrl.Split(',')[0]">
+    }
+    @if (Model.Type == "video")
+    {
+        <meta property="og:video" content="@Model.FeedImageUrl.Split(',')[0]" />
+        @if (@Model.Meta.IsThumbnailReady())
+        {
+            <meta property="og:image" content="@Model.Meta.Thumbnail" />
+        }
+    }
+    <meta property="article:published_time" content="@Model.CreatedDate+00:00" />
+    @if (!string.IsNullOrEmpty(Model.Social.FacebookAppID))
+    {
+        <meta property="fb:app_id" content="@Model.Social.FacebookAppID" />
+    }
+}
+@section Styles {
+    <environment include="Development">
+        <link rel="stylesheet" href="~/lib/video-js/video-js.css" />
+        <link rel="stylesheet" href="~/lib/videojs-resolution-switcher/videojs-resolution-switcher.css" />
+        <link rel="stylesheet" type="text/css" href="~/lib/nanogallery2/dist/css/nanogallery2.min.css">
+    </environment>
+    <environment exclude="Development">
+        <link rel="stylesheet" href="~/lib/video-js/video-js.min.css" />
+        <link rel="stylesheet" href="~/lib/videojs-resolution-switcher/videojs-resolution-switcher.min.css" />
+        <link rel="stylesheet" type="text/css" href="~/lib/nanogallery2/dist/css/nanogallery2.min.css">
+    </environment>
+}
+<div class="row main-container">
+    <div class="col-md-3 hidden-sm sidebar"></div>
+    <div class="col-md-6 col-sm-12 post-container">
+        <div class="row post">
+            <div class="row post-header">
+                @if (@Model.Type == "system")
+                {
+                    <div class="system-image">
+                        <img src="@Model.CreatorImageUrl" class="img-responsive img-post" alt="@Model.CreatedBy">
+                        <p class="post-time">Posted @Model.CreatedDate.TimeAgo(Model.TimeOffset)</p>                                     
+                    </div>
+                }
+                else
+                {
+                    <div class="col-sm-12">
+                        <div class="header-image">
+                            <img src="@Model.CreatorImageUrl" class="img-circle img-profile" alt="@Model.CreatedBy">
+                        </div>
+                        <div class="header-info">
+                            <h2 class="post-title">
+                                <strong>@Model.CreatedBy</strong> @Model.Title.ToLower()
+                                @if (Model.Type == "youtube")
+                                {
+                                    @:video
+                                }
+                            </h2>
+                            <p class="post-time">Posted @Model.CreatedDate.TimeAgo(Model.TimeOffset)</p>                                       
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="row post-content">
+                @switch (@Model.Type)
+                {
+                    case "status":
+                    case "text":
+                        <div class="row post-status">
+                            <div class="post-text">@Html.Raw(Model.Content)</div>
+                        </div>
+                        break;
+                    case "photos":
+                    case "image":
+                        <div class="row post-image">
+                            <div class="post-text">@Html.Raw(Model.Content)</div>
+                            <div id="imageGallery"></div>
+                        </div>
+                        break;
+                    case "video":
+                        <div class="row post-video">
+                            <div class="post-text">@Html.Raw(Model.Content)</div>
+                            @if (@Model.Meta.IsThumbnailReady() && @Model.Meta.IsVideoReady())
+                            {
+                                <video id="post-video-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="none" width="565" height="320" poster="@Model.Meta.Thumbnail" data-setup="{}">
+                                    @if (!string.IsNullOrEmpty(@Model.Meta.V360))
+                                    {
+                                        <source src="@Model.Meta.V360" type='video/mp4' label='360p' res="360" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(@Model.Meta.V480))
+                                    {
+                                        <source src="@Model.Meta.V480" type='video/mp4' label='480p' res="480" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(@Model.Meta.V720))
+                                    {
+                                        <source src="@Model.Meta.V720" type='video/mp4' label='720p' res="720" />
+                                    }
+                                    @if (!string.IsNullOrEmpty(@Model.Meta.V1080))
+                                    {
+                                        <source src="@Model.Meta.V1080" type='video/mp4' label='1080p' res="1080" />
+                                    }
+                                    <p class="vjs-no-js">
+                                        To view this video please enable JavaScript, and consider upgrading to a web browser that
+                                        <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                                    </p>
+                                </video>
+                            }
+                            else
+                            {
+                                @if (@Model.FeedImageUrl.EndsWith(".mp4"))
+                                {
+                                    <video id="post-video-player" class="video-js vjs-default-skin vjs-big-play-centered" controls preload="none" width="565" height="320" data-setup="{}">
+                                        <source src="@Model.FeedImageUrl" type='video/mp4'>
+                                        <p class="vjs-no-js">
+                                            To view this video please enable JavaScript, and consider upgrading to a web browser that
+                                            <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+                                        </p>
+                                    </video>
+                                }
+                                else
+                                {
+                                    <div class="unsupported-video-info">
+                                        <p>This video is being optimized for bandwidth, please comeback later and refresh the page ...</p>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        break;
+                    case "youtube":
+                        <div class="row post-video">
+                            <div class="post-text">@Html.Raw(Model.Content)</div>
+                            @if (Model.FeedImageUrl.StartsWith("https://youtu.be/"))
+                            {
+                                <iframe width="100%" height="315" src="https://www.youtube.com/embed/@Model.FeedImageUrl.Split("/")[3]" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                            }
+                            else
+                            {
+                                <iframe width="100%" height="315" src="https://www.youtube.com/embed/@Model.FeedImageUrl.Split("?v=")[1]" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+                            }
+                        </div>
+                        break;
+                    case "url":
+                    case "preview":
+                        <div class="row post-url">
+                            <div class="post-text">@Html.Raw(Model.Content)</div>
+                        </div>
+                        break;
+                    case "system":
+                        <div class="row post-system">
+                            <div class="post-text system-text">@Html.Raw(Model.Content)</div>
+                        </div>
+                        break;
+                }
+            </div>
+            <div class="row share">
+                <div id="shareButton" class="col-md-12"></div>
+            </div>
+            <div class="row post-footer">
+                <p class="copyright-footer"><a href="https://selfdrvn.com" target="_blank" class="copyright">SelfDrvn Enterprise &copy; 2021</a> | <a href="https://selfdrvn.com/privacy-policy/" target="_blank">Privacy Policy</a> | <a href="https://selfdrvn.com/about-selfdrvn/" target="_blank">About Us</a> | <a href="https://selfdrvn.com/contact-us/" target="_blank">Contact Us</a></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 hidden-sm sidebar"></div>
+</div>
+@section Scripts {
+    <script type="text/javascript">
+    var imagesUrl = '@Model.FeedImageUrl';
+    </script>
+    <environment include="Development">
+        <script src="~/lib/autolinker/autolinker.js"></script>
+        <script src="~/lib/video-js/video.js"></script>
+        <script src="~/lib/videojs-resolution-switcher/videojs-resolution-switcher.js"></script>
+        <script type="text/javascript" src="~/lib/nanogallery2/dist/jquery.nanogallery2.js"></script>
+        <script src="~/js/post.js" asp-append-version="true"></script>
+    </environment>
+    <environment exclude="Development">
+        <script src="~/lib/autolinker/autolinker.min.js"></script>
+        <script src="~/lib/video-js/video.min.js"></script>
+        <script src="~/lib/videojs-resolution-switcher/videojs-resolution-switcher.min.js"></script>
+        <script type="text/javascript" src="~/lib/nanogallery2/dist/jquery.nanogallery2.min.js"></script>
+        <script src="~/js/post.min.js" asp-append-version="true"></script>
+    </environment>
+}

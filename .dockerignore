@@ -1,0 +1,6 @@
+bin\
+obj\
+[Ww]ork
+appSettings.*.json
+compose.*.yml
+docker-*.cmd

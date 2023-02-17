@@ -1,0 +1,61 @@
+version: '2'
+services:
+  mongo:
+    image: mongo
+    hostname: mongosharestaging
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: "post"
+      MONGO_INITDB_ROOT_PASSWORD: "share"
+    ports:
+      - 27017
+    volumes:
+      - mongosharestaging:/data/db
+  mongoexpress:
+    depends_on:
+      - mongo
+    image: mongo-express
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    ports:
+      - 8081
+    environment:
+      ME_CONFIG_MONGODB_SERVER: "mongosharestaging"
+      ME_CONFIG_MONGODB_ADMINUSERNAME: "post"
+      ME_CONFIG_MONGODB_ADMINPASSWORD: "share"
+    links:
+      - 'mongo:mongoexpress'
+  feedshare:
+    image: registry-intl.ap-southeast-3.aliyuncs.com/selfdrvn/sd-feeds-share:1.1.3
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    environment:
+      - IDP_AUTHORITY=https://selfdrvn-identity-fp-staging.azurewebsites.net/common
+      - IDP_CLIENT_ID=SelfDrvn.API
+      - IDP_CLIENT_SECRET=6726e4e1-501a-40d3-85be-590804fcd8bb
+      - DATABASE_SERVER=mongosharestaging
+      - DATABASE_PORT=27017
+      - DATABASE_NAME=posts
+      - DATABASE_USER=post
+      - DATABASE_PASSWORD=share
+    ports:
+      - '3001:80/tcp'
+    restart_policy:
+        condition: on-failure
+    labels:
+      aliyun.scale: '1'
+      aliyun.lb.port_80: 'https://sd-feeds-share-slb:443'
+    memswap_limit: 0
+    shm_size: 0
+    memswap_reservation: 0
+    kernel_memory: 0
+    name: feedshare
+volumes:
+  mongosharestaging:
